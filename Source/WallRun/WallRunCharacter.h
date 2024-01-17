@@ -6,6 +6,14 @@
 #include "GameFramework/Character.h"
 #include "WallRunCharacter.generated.h"
 
+UENUM()
+enum class ERunWallSide : uint8
+{
+	None,
+	Left,
+	Right
+};
+
 class UInputComponent;
 class USkeletalMeshComponent;
 class USceneComponent;
@@ -107,5 +115,10 @@ public:
 	/** Returns FirstPersonCameraComponent subobject **/
 	UCameraComponent* GetFirstPersonCameraComponent() const { return FirstPersonCameraComponent; }
 
+private:
+	UFUNCTION()
+		void OnPlayerCapsuleHit(UPrimitiveComponent* HitComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit);
+
+	bool IsSurfaceRunable(const FVector& SurfaceNormal);
 };
 
