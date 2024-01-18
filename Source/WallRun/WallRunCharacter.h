@@ -28,7 +28,7 @@ class AWallRunCharacter : public ACharacter
 	GENERATED_BODY()
 
 	/** Pawn mesh: 1st person view (arms; seen only by self) */
-	UPROPERTY(VisibleDefaultsOnly, Category=Mesh)
+	UPROPERTY(VisibleDefaultsOnly, Category = Mesh)
 	USkeletalMeshComponent* Mesh1P;
 
 	/** Gun mesh: 1st person view (seen only by self) */
@@ -46,28 +46,30 @@ class AWallRunCharacter : public ACharacter
 public:
 	AWallRunCharacter();
 
+	virtual void Tick(float DeltaSeconds) override;
+
 protected:
 	virtual void BeginPlay();
 
 public:
 	/** Base turn rate, in deg/sec. Other scaling may affect final turn rate. */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=Camera)
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera)
 	float BaseTurnRate;
 
 	/** Base look up/down rate, in deg/sec. Other scaling may affect final rate. */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=Camera)
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera)
 	float BaseLookUpRate;
 
 	/** Gun muzzle's offset from the characters location */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Gameplay)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Gameplay)
 	FVector GunOffset;
 
 	/** Projectile class to spawn */
-	UPROPERTY(EditDefaultsOnly, Category=Projectile)
+	UPROPERTY(EditDefaultsOnly, Category = Projectile)
 	TSubclassOf<class AWallRunProjectile> ProjectileClass;
 
 	/** Sound to play each time we fire */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Gameplay)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Gameplay)
 	USoundBase* FireSound;
 
 	/** AnimMontage to play each time we fire */
@@ -75,7 +77,7 @@ public:
 	UAnimMontage* FireAnimation;
 
 protected:
-	
+
 	/** Fires a projectile. */
 	void OnFire();
 
@@ -96,14 +98,17 @@ protected:
 	 * @param Rate	This is a normalized rate, i.e. 1.0 means 100% of desired turn rate
 	 */
 	void LookUpAtRate(float Rate);
-	
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "WallRun")
+	float MaxWallRunTime = 1.0f;
+
 protected:
 	// APawn interface
 	virtual void SetupPlayerInputComponent(UInputComponent* InputComponent) override;
 	// End of APawn interface
 
-	/* 
-	 * Configures input for touchscreen devices if there is a valid touch interface for doing so 
+	/*
+	 * Configures input for touchscreen devices if there is a valid touch interface for doing so
 	 *
 	 * @param	InputComponent	The input component pointer to bind controls to
 	 * @returns true if touch controls were enabled.
@@ -117,8 +122,23 @@ public:
 
 private:
 	UFUNCTION()
-		void OnPlayerCapsuleHit(UPrimitiveComponent* HitComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit);
+	void OnPlayerCapsuleHit(UPrimitiveComponent* HitComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit);
 
 	bool IsSurfaceRunable(const FVector& SurfaceNormal);
-};
 
+	bool RequiredKeysDown(ERunWallSide Side);
+
+	float RightAxis = 0.0f;
+	float ForwardAxis = 0.0f;
+
+	void StartWallRun(ERunWallSide Side, const FVector& Direction);
+	void UpdateWallRun();
+	void StopWallRun();
+
+	bool IsWallRun = false;
+	ERunWallSide CurrentWallSide = ERunWallSide::None;
+	FVector CurrentWallRunDirection = FVector::ZeroVector;
+
+	FTimerHandle WallRunTimer;
+
+};

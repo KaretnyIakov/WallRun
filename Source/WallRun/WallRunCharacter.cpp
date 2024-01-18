@@ -62,6 +62,13 @@ AWallRunCharacter::AWallRunCharacter()
 
 }
 
+void AWallRunCharacter::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	if (IsWallRun)
+		UpdateWallRun();
+}
+
 void AWallRunCharacter::BeginPlay()
 {
 	// Call the base class  
@@ -103,23 +110,38 @@ void AWallRunCharacter::SetupPlayerInputComponent(class UInputComponent* PlayerI
 
 void AWallRunCharacter::OnPlayerCapsuleHit(UPrimitiveComponent* HitComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit)
 {
+	if (IsWallRun)
+		return;
+
 	FVector HitNormal = Hit.ImpactNormal;
 
 	if (!IsSurfaceRunable(HitNormal))
 		return;
 	
+	if (!GetCharacterMovement()->IsFalling()) 
+	{
+		return;
+	}
+
 	ERunWallSide Side = ERunWallSide::None;
+	FVector Direction = FVector::ZeroVector;
 	if (FVector::DotProduct(HitNormal, GetActorRightVector()) > 0)
 	{
 		Side = ERunWallSide::Left;
+		Direction = FVector::CrossProduct(HitNormal, FVector::UpVector).GetSafeNormal();
 		GEngine->AddOnScreenDebugMessage(-1, 1.0f, FColor::Green, TEXT("Capsule Hit LEFT!"));
 	}
 	else
 	{
 		Side = ERunWallSide::Right;
+		Direction = FVector::CrossProduct(FVector::UpVector, HitNormal).GetSafeNormal();
 		GEngine->AddOnScreenDebugMessage(-1, 1.0f, FColor::Green, TEXT("Capsule Hit RIGHT!"));
 	}
 
+	if (!RequiredKeysDown(Side))
+		return;
+
+	StartWallRun(Side, Direction);
 }
 
 bool AWallRunCharacter::IsSurfaceRunable(const FVector& SurfaceNormal)
@@ -127,6 +149,61 @@ bool AWallRunCharacter::IsSurfaceRunable(const FVector& SurfaceNormal)
 	if (SurfaceNormal.Z > GetCharacterMovement()->GetWalkableFloorZ() || SurfaceNormal.Z < -0.005f)
 		return false;
 	return true;
+}
+
+bool AWallRunCharacter::RequiredKeysDown(ERunWallSide Side)
+{
+	if (ForwardAxis < 0.1f)
+		return false;
+
+	if (Side == ERunWallSide::Left && RightAxis > 0.1f)
+		return false;
+
+	if (Side == ERunWallSide::Right && RightAxis < -0.1f)
+		return false;
+
+	return true;
+}
+
+void AWallRunCharacter::StartWallRun(ERunWallSide Side, const FVector& Direction)
+{
+	IsWallRun = true;
+	GEngine->AddOnScreenDebugMessage(-1, 1.0f, FColor::Yellow, TEXT("Start Run!"));
+
+	CurrentWallSide = Side;
+	CurrentWallRunDirection = Direction;
+
+	GetCharacterMovement()->SetPlaneConstraintEnabled(true);
+	GetCharacterMovement()->SetPlaneConstraintNormal(FVector::UpVector);
+
+	GetWorld()->GetTimerManager().SetTimer(WallRunTimer, this, &AWallRunCharacter::StopWallRun, MaxWallRunTime, false);
+}
+
+void AWallRunCharacter::UpdateWallRun()
+{
+	FHitResult HitResult;
+
+	FVector StartPosition = GetActorLocation();
+	FVector TraceDirection = CurrentWallSide == ERunWallSide::Right ? GetActorRightVector() : -GetActorRightVector();
+	FVector EndPosition = StartPosition + 200.0f * TraceDirection;
+
+	FCollisionQueryParams QueryParams;
+	QueryParams.AddIgnoredActor(this);
+
+	if (!GetWorld()->LineTraceSingleByChannel(HitResult, StartPosition, EndPosition, ECC_Visibility, QueryParams))
+		StopWallRun();
+}
+
+void AWallRunCharacter::StopWallRun()
+{
+	IsWallRun = false;
+	GEngine->AddOnScreenDebugMessage(-1, 1.0f, FColor::Red, TEXT("Stop Run!"));
+
+	CurrentWallSide = ERunWallSide::None;
+	CurrentWallRunDirection = FVector::ZeroVector;
+
+	GetCharacterMovement()->SetPlaneConstraintEnabled(false);
+	GetCharacterMovement()->SetPlaneConstraintNormal(FVector::ZeroVector);
 }
 
 void AWallRunCharacter::OnFire()
@@ -170,6 +247,7 @@ void AWallRunCharacter::OnFire()
 
 void AWallRunCharacter::MoveForward(float Value)
 {
+	ForwardAxis = Value;
 	if (Value != 0.0f)
 	{
 		// add movement in that direction
@@ -179,6 +257,7 @@ void AWallRunCharacter::MoveForward(float Value)
 
 void AWallRunCharacter::MoveRight(float Value)
 {
+	RightAxis = Value;
 	if (Value != 0.0f)
 	{
 		// add movement in that direction
