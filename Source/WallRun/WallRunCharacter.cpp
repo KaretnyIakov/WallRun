@@ -125,18 +125,7 @@ void AWallRunCharacter::OnPlayerCapsuleHit(UPrimitiveComponent* HitComponent, AA
 
 	ERunWallSide Side = ERunWallSide::None;
 	FVector Direction = FVector::ZeroVector;
-	if (FVector::DotProduct(HitNormal, GetActorRightVector()) > 0)
-	{
-		Side = ERunWallSide::Left;
-		Direction = FVector::CrossProduct(HitNormal, FVector::UpVector).GetSafeNormal();
-		GEngine->AddOnScreenDebugMessage(-1, 1.0f, FColor::Green, TEXT("Capsule Hit LEFT!"));
-	}
-	else
-	{
-		Side = ERunWallSide::Right;
-		Direction = FVector::CrossProduct(FVector::UpVector, HitNormal).GetSafeNormal();
-		GEngine->AddOnScreenDebugMessage(-1, 1.0f, FColor::Green, TEXT("Capsule Hit RIGHT!"));
-	}
+	GetWallRunSideAndDirection(HitNormal, Side, Direction);
 
 	if (!RequiredKeysDown(Side))
 		return;
@@ -144,14 +133,30 @@ void AWallRunCharacter::OnPlayerCapsuleHit(UPrimitiveComponent* HitComponent, AA
 	StartWallRun(Side, Direction);
 }
 
-bool AWallRunCharacter::IsSurfaceRunable(const FVector& SurfaceNormal)
+void AWallRunCharacter::GetWallRunSideAndDirection(const FVector& HitNormal, ERunWallSide& OutSide, FVector& OutDirection) const
+{
+	if (FVector::DotProduct(HitNormal, GetActorRightVector()) > 0)
+	{
+		OutSide = ERunWallSide::Left;
+		OutDirection = FVector::CrossProduct(HitNormal, FVector::UpVector).GetSafeNormal();
+		//GEngine->AddOnScreenDebugMessage(-1, 1.0f, FColor::Green, TEXT("Capsule Hit LEFT!"));
+	}
+	else
+	{
+		OutSide = ERunWallSide::Right;
+		OutDirection = FVector::CrossProduct(FVector::UpVector, HitNormal).GetSafeNormal();
+		//GEngine->AddOnScreenDebugMessage(-1, 1.0f, FColor::Green, TEXT("Capsule Hit RIGHT!"));
+	}
+}
+
+bool AWallRunCharacter::IsSurfaceRunable(const FVector& SurfaceNormal) const
 {
 	if (SurfaceNormal.Z > GetCharacterMovement()->GetWalkableFloorZ() || SurfaceNormal.Z < -0.005f)
 		return false;
 	return true;
 }
 
-bool AWallRunCharacter::RequiredKeysDown(ERunWallSide Side)
+bool AWallRunCharacter::RequiredKeysDown(ERunWallSide Side) const
 {
 	if (ForwardAxis < 0.1f)
 		return false;
@@ -181,17 +186,43 @@ void AWallRunCharacter::StartWallRun(ERunWallSide Side, const FVector& Direction
 
 void AWallRunCharacter::UpdateWallRun()
 {
+	if (!RequiredKeysDown(CurrentWallSide))
+	{
+		StopWallRun();
+		return;
+	}
+
 	FHitResult HitResult;
 
 	FVector StartPosition = GetActorLocation();
 	FVector TraceDirection = CurrentWallSide == ERunWallSide::Right ? GetActorRightVector() : -GetActorRightVector();
-	FVector EndPosition = StartPosition + 200.0f * TraceDirection;
+	float TraceLenght = 200.0f;
+	FVector EndPosition = StartPosition + TraceLenght * TraceDirection;
 
 	FCollisionQueryParams QueryParams;
 	QueryParams.AddIgnoredActor(this);
 
-	if (!GetWorld()->LineTraceSingleByChannel(HitResult, StartPosition, EndPosition, ECC_Visibility, QueryParams))
+	if (GetWorld()->LineTraceSingleByChannel(HitResult, StartPosition, EndPosition, ECC_Visibility, QueryParams)) 
+	{
+		ERunWallSide Side = ERunWallSide::None;
+		FVector Direction = FVector::ZeroVector;
+		GetWallRunSideAndDirection(HitResult.ImpactNormal, Side, Direction);
+
+		if (Side != CurrentWallSide) 
+		{
+			StopWallRun();
+		}
+		else 
+		{
+			CurrentWallRunDirection = Direction;
+			GetCharacterMovement()->Velocity = GetCharacterMovement()->GetMaxSpeed() * CurrentWallRunDirection;
+		}
+	}
+	else 
+	{
 		StopWallRun();
+	}
+		
 }
 
 void AWallRunCharacter::StopWallRun()
