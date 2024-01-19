@@ -90,6 +90,32 @@ void AWallRunCharacter::BeginPlay()
 	}
 }
 
+void AWallRunCharacter::Jump()
+{
+	if (IsWallRun)
+	{
+		FVector JumpDirection = FVector::ZeroVector;
+
+		if (CurrentWallSide == ERunWallSide::Right)
+		{
+			JumpDirection = FVector::CrossProduct(CurrentWallRunDirection, FVector::UpVector).GetSafeNormal();
+		} 
+		else
+		{
+			JumpDirection = FVector::CrossProduct(FVector::UpVector, CurrentWallRunDirection).GetSafeNormal();
+		}
+
+		JumpDirection += FVector::UpVector;
+
+		LaunchCharacter(GetCharacterMovement()->JumpZVelocity * JumpDirection.GetSafeNormal(), false, true);
+		StopWallRun();
+	}
+	else
+	{
+		Super::Jump();
+	}
+}
+
 //////////////////////////////////////////////////////////////////////////
 // Input
 
