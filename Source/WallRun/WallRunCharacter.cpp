@@ -65,8 +65,11 @@ AWallRunCharacter::AWallRunCharacter()
 void AWallRunCharacter::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+
 	if (IsWallRun)
 		UpdateWallRun();
+
+	CameraTiltTimeline.TickTimeline(DeltaSeconds);
 }
 
 void AWallRunCharacter::BeginPlay()
@@ -78,6 +81,13 @@ void AWallRunCharacter::BeginPlay()
 	FP_Gun->AttachToComponent(Mesh1P, FAttachmentTransformRules(EAttachmentRule::SnapToTarget, true), TEXT("GripPoint"));
 
 	GetCapsuleComponent()->OnComponentHit.AddDynamic(this, &AWallRunCharacter::OnPlayerCapsuleHit);
+
+	if (IsValid(CameraTiltCurve)) 
+	{
+		FOnTimelineFloat TimelineCallback;
+		TimelineCallback.BindUFunction(this, FName("UpdateCameraTilt"));
+		CameraTiltTimeline.AddInterpFloat(CameraTiltCurve, TimelineCallback);
+	}
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -175,6 +185,8 @@ void AWallRunCharacter::StartWallRun(ERunWallSide Side, const FVector& Direction
 	IsWallRun = true;
 	GEngine->AddOnScreenDebugMessage(-1, 1.0f, FColor::Yellow, TEXT("Start Run!"));
 
+	BeginCameraTilt();
+
 	CurrentWallSide = Side;
 	CurrentWallRunDirection = Direction;
 
@@ -230,11 +242,20 @@ void AWallRunCharacter::StopWallRun()
 	IsWallRun = false;
 	GEngine->AddOnScreenDebugMessage(-1, 1.0f, FColor::Red, TEXT("Stop Run!"));
 
-	CurrentWallSide = ERunWallSide::None;
-	CurrentWallRunDirection = FVector::ZeroVector;
+	EndCameraTilt();
+
+	//CurrentWallSide = ERunWallSide::None;
+	//CurrentWallRunDirection = FVector::ZeroVector;
 
 	GetCharacterMovement()->SetPlaneConstraintEnabled(false);
 	GetCharacterMovement()->SetPlaneConstraintNormal(FVector::ZeroVector);
+}
+
+void AWallRunCharacter::UpdateCameraTilt(float Value)
+{
+	FRotator CurrentCameraRotation = GetControlRotation();
+	CurrentCameraRotation.Roll = CurrentWallSide == ERunWallSide::Left ? Value : -Value;
+	GetController()->SetControlRotation(CurrentCameraRotation);
 }
 
 void AWallRunCharacter::OnFire()
